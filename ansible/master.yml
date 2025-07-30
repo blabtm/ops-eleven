@@ -1,0 +1,26 @@
+- name: Setup Docker
+  hosts: node
+  become: true
+  roles:
+    - role: node
+
+- name: Setup Swarm Origin
+  hosts: mgmt[0]
+  roles:
+    - role: mgmt
+      vars:
+        origin: true
+
+- name: Setup Manager
+  hosts: mgmt:!mgmt[0]
+  roles:
+    - role: mgmt
+      vars:
+        token: "{{ hostvars[groups['mgmt'][0]]['mtok'].stdout }}"
+
+- name: Setup Worker
+  hosts: work
+  roles:
+    - role: work
+      vars:
+        token: "{{ hostvars[groups['mgmt'][0]]['wtok'].stdout }}"

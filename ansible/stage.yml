@@ -1,0 +1,19 @@
+- name: Deploy EMQX
+  hosts: mgmt[0]
+  environment:
+    REGISTRY: "{{ registry }}"
+
+  tasks:
+    - name: Copy
+      ansible.builtin.copy:
+        src: stack/stage/emqx.stage.yml
+        dest: stack/stage/emqx.stage.yml
+    
+    - name: Remove
+      ansible.builtin.shell:
+        cmd: docker stack rm emqx
+
+    - name: Deploy
+      ansible.builtin.shell:
+        cmd: docker stack deploy -c stack/stage/emqx.stage.yml emqx
+  

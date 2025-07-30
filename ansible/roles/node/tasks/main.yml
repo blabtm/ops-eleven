@@ -1,0 +1,60 @@
+- name: Uninstall Conflicting Packages
+  ansible.builtin.apt:
+    pkg:
+      - runc
+      - containerd
+      - podman-docker
+      - docker-compose
+      - docker-doc
+      - docker.io
+    state: absent
+
+- name: Install Requirements
+  ansible.builtin.apt:
+    pkg:
+      - ca-certificates
+      - curl
+      - gnupg-agent
+    state: latest
+
+- name: Install Docker's Official GPG Key
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/debian/gpg
+    state: present
+
+- name: Add Docker's APT Repository
+  ansible.builtin.apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+    state: present
+
+- name: Install Engine
+  ansible.builtin.apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: latest
+
+- name: Grant Persmissions
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Configure Daemon
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+
+- name: Restart
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    enabled: true
+
+- name: Collect Status
+  ansible.builtin.shell: 
+    cmd: docker info --format '{{ "{{.Swarm.LocalNodeState}}" }}'
+  register: status

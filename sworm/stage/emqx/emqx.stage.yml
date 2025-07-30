@@ -1,0 +1,97 @@
+networks:
+  stage:
+    external: true
+
+configs:
+  emqx-rest:
+    file: ./emqx-rest.cfg
+
+services:
+  emqx-node:
+    image: ${REGISTRY}/emqx:5.8.6
+    environment:
+      EMQX_API_KEY__BOOTSTRAP_FILE: /etc/secret.cfg
+      EMQX_CLUSTER__DISCOVERY_STRATEGY: dns
+      EMQX_CLUSTER__DNS__NAME: emqx-node
+      EMQX_CLUSTER__DNS__RECORD_TYPE: a
+    networks:
+      - stage
+    configs:
+      - source: emqx-rest
+        target: /etc/secret.cfg
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+          - node.hostname == vneptune
+
+  emqx:
+    image: ${REGISTRY}/emqx-proxy:5.8.6
+    ports:
+      - 1883:1883
+      - 18083:18083
+      - 20041:20041
+    environment:
+      NODE_NAME: emqx-node
+      NODE_PORT_MQTT: 1883
+      NODE_PORT_DASH: 18083
+      NODE_PORT_VCAS: 20041
+      NODE_PORT_ADAP: 9100
+      PORT_MQTT: 1883
+      PORT_DASH: 18083
+      PORT_VCAS: 20041
+      PORT_ADAP: 9100
+    networks:
+      - stage
+    depends_on:
+      - emqx-node
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == vpluto
+
+  emqx-gate-node:
+    image: ${REGISTRY}/emqx-gate:0.1.0
+    environment:
+      PORT: 9002
+      EMQX_ADAP_HOST: emqx
+      EMQX_ADAP_PORT: 9100
+    networks:
+      - stage
+    depends_on:
+      - emqx
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+          - node.hostname == jupiter
+
+  emqx-gate:
+    image: ${REGISTRY}/emqx-gate-proxy:0.1.0
+    ports:
+      - 9001:9001
+    environment:
+      PORT: 9001
+      NETWORK: 172.28.0.0
+      NODE_NAME: emqx-gate-node
+      NODE_PORT: 9002
+      EMQX_HOST: emqx
+      EMQX_PORT_ADAP: 9100
+      EMQX_PORT_DASH: 18083
+      EMQX_PORT_VCAS: 20041
+      EMQX_USER: gate
+      EMQX_PASS: pass
+    networks:
+      - stage
+    depends_on:
+      - emqx-gate-node
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == vpluto
+
+

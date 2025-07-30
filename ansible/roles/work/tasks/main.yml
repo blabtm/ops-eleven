@@ -1,0 +1,8 @@
+- name: Leave Swarm
+  ansible.builtin.shell:
+    cmd: docker swarm leave --force
+  when: "'inactive' not in status.stdout"
+
+- name: Join Swarm as Worker
+  ansible.builtin.shell:
+    cmd: docker swarm join --token {{ token }} {{ hostvars[groups['mgmt'][0]]['ansible_default_ipv4']['address'] }}:2377

@@ -1,0 +1,45 @@
+- block:
+    - name: Initialize Swarm
+      ansible.builtin.shell:
+        cmd: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+      when: "'inactive' in status.stdout"
+
+    - name: Demote Managers
+      ansible.builtin.shell:
+        cmd: docker node demote $(docker node ls | grep -v '*' | grep -e "Leader" -e "Reachable" | cut -d' ' -f1)
+      when: "'inactive' not in status.stdout"
+
+    - name: Remove Nodes
+      ansible.builtin.shell:
+        cmd: docker node rm $(docker node ls | grep -v '*' | cut -d' ' -f1)
+      when: "'inactive' not in status.stdout"
+
+    - name: Retrieve Swarm Manager Token
+      ansible.builtin.shell:
+        cmd: docker swarm join-token manager -q
+      register: mtok
+
+    - name: Retrieve Swarm Worker Token
+      ansible.builtin.shell:
+        cmd: docker swarm join-token worker -q
+      register: wtok
+
+    - name: Setup Stage Network
+      ansible.builtin.shell:
+        cmd: docker network create --attachable --driver overlay --subnet 172.28.0.0/16 stage
+
+    - name: Setup Production Network
+      ansible.builtin.shell:
+        cmd: docker network create --driver overlay --subnet 172.29.0.0/16 prod
+  when: origin
+
+- block:
+    - name: Leave Swarm
+      ansible.builtin.shell:
+        cmd: docker swarm leave --force
+      when: "'inactive' not in status.stdout"
+
+    - name: Join Swarm as Manager
+      ansible.builtin.shell:
+        cmd: docker swarm join --token {{ token }} {{ hostvars[groups['mgmt'][0]]['ansible_default_ipv4']['address'] }}:2377
+  when: not origin
