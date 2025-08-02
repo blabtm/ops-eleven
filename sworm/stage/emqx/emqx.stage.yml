@@ -4,7 +4,7 @@ networks:
 
 configs:
   emqx-rest:
-    file: ./emqx-rest.cfg
+    file: config/emqx-rest.cfg
 
 services:
   emqx-node:
@@ -25,14 +25,22 @@ services:
       endpoint_mode: dnsrr
       placement:
         constraints:
-          - node.hostname == vneptune
+          - node.hostname != zeus
 
   emqx:
     image: ${REGISTRY}/emqx-proxy:5.8.6
     ports:
-      - 1883:1883
-      - 18083:18083
-      - 20041:20041
+      - target: 1883
+        published: 1883
+        protocol: tcp
+
+      - target: 18083
+        published: 18083
+        protocol: tcp
+
+      - target: 20041
+        published: 20041
+        protocol: tcp
     environment:
       NODE_NAME: emqx-node
       NODE_PORT_MQTT: 1883
@@ -50,7 +58,7 @@ services:
     deploy:
       placement:
         constraints:
-          - node.hostname == vpluto
+          - node.hostname == zeus
 
   emqx-gate-node:
     image: ${REGISTRY}/emqx-gate:0.1.0
@@ -68,7 +76,7 @@ services:
       endpoint_mode: dnsrr
       placement:
         constraints:
-          - node.hostname == jupiter
+          - node.hostname != zeus
 
   emqx-gate:
     image: ${REGISTRY}/emqx-gate-proxy:0.1.0
@@ -89,9 +97,4 @@ services:
       - stage
     depends_on:
       - emqx-gate-node
-    deploy:
-      placement:
-        constraints:
-          - node.hostname == vpluto
-
 

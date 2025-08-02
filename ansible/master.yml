@@ -4,7 +4,7 @@
   roles:
     - role: node
 
-- name: Setup Swarm Origin
+- name: Setup Swarm
   hosts: mgmt[0]
   roles:
     - role: mgmt
@@ -16,6 +16,7 @@
   roles:
     - role: mgmt
       vars:
+        origin: false
         token: "{{ hostvars[groups['mgmt'][0]]['mtok'].stdout }}"
 
 - name: Setup Worker
@@ -24,3 +25,10 @@
     - role: work
       vars:
         token: "{{ hostvars[groups['mgmt'][0]]['wtok'].stdout }}"
+
+- name: Deploy registry
+  hosts: zeus
+  tasks:
+    - name: Start or Create
+      ansible.builtin.shell:
+        cmd: docker start registry || docker run -d -p 5000:5000 --restart always --name registry registry:latest

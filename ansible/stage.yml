@@ -1,19 +1,33 @@
+- name: Gather Zeus address
+  hosts: zeus
+  gather_facts: true
+
 - name: Deploy EMQX
   hosts: mgmt[0]
-  environment:
-    REGISTRY: "{{ registry }}"
 
   tasks:
-    - name: Copy
+    - name: Create layout
+      ansible.builtin.file:
+        path: stack/stage/emqx/config
+        state: directory
+
+    - name: Copy config
       ansible.builtin.copy:
-        src: stack/stage/emqx.stage.yml
-        dest: stack/stage/emqx.stage.yml
+        src: ../sworm/stage/emqx/config/emqx-rest.cfg
+        dest: stack/stage/emqx/config/emqx-rest.cfg
+
+    - name: Copy stack
+      ansible.builtin.copy:
+        src: ../sworm/stage/emqx/emqx.stage.yml
+        dest: stack/stage/emqx/emqx.stage.yml
     
-    - name: Remove
+    - name: Remove existing stack
       ansible.builtin.shell:
         cmd: docker stack rm emqx
 
-    - name: Deploy
+    - name: Deploy stack
       ansible.builtin.shell:
-        cmd: docker stack deploy -c stack/stage/emqx.stage.yml emqx
+        cmd: docker stack deploy -c stack/stage/emqx/emqx.stage.yml emqx
+      environment:
+        REGISTRY: "{{ hostvars['zeus']['ansible_default_ipv4']['address'] }}:5000"
   

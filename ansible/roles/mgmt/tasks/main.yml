@@ -1,43 +1,64 @@
 - block:
-    - name: Initialize Swarm
-      ansible.builtin.shell:
-        cmd: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-      when: "'inactive' in status.stdout"
+    - block:
+        - block:
+            - name: Recognize managers
+              ansible.builtin.shell:
+                cmd: docker node ls | tail -n +2 | grep -v '*' | grep -e "Leader" -e "Reachable" | cut -d' ' -f1
+              register: managers
 
-    - name: Demote Managers
-      ansible.builtin.shell:
-        cmd: docker node demote $(docker node ls | grep -v '*' | grep -e "Leader" -e "Reachable" | cut -d' ' -f1)
-      when: "'inactive' not in status.stdout"
+            - name: Demote managers
+              ansible.builtin.shell:
+                cmd: "docker node demote {{ managers.stdout | replace('\n', ' ') }}"
+              when: managers.stdout != ''
 
-    - name: Remove Nodes
-      ansible.builtin.shell:
-        cmd: docker node rm $(docker node ls | grep -v '*' | cut -d' ' -f1)
-      when: "'inactive' not in status.stdout"
+            - name: Recognize nodes
+              ansible.builtin.shell:
+                cmd: docker node ls | tail -n +2 | grep -v '*' | cut -d' ' -f1
+              register: nodes
 
-    - name: Retrieve Swarm Manager Token
+            - name: Remove nodes
+              ansible.builtin.shell:
+                cmd: "docker node rm --force {{ nodes.stdout | replace('\n', ' ') }}"
+              when: nodes.stdout != ''
+          when: manager.stdout == 'true'
+
+        - block:
+              - name: Leave Swarm
+                ansible.builtin.shell:
+                  cmd: docker swarm leave --force
+          when: manager.stdout != 'true'
+      when: state.stdout != 'inactive'
+
+    - block:
+        - name: Initialize Swarm
+          ansible.builtin.shell:
+            cmd: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+      when: state.stdout == 'inactive' or manager.stdout != 'true'
+
+    - name: Retrieve Swarm Manager token
       ansible.builtin.shell:
         cmd: docker swarm join-token manager -q
       register: mtok
 
-    - name: Retrieve Swarm Worker Token
+    - name: Retrieve Swarm Worker token
       ansible.builtin.shell:
         cmd: docker swarm join-token worker -q
       register: wtok
 
-    - name: Setup Stage Network
+    - name: Setup stage network
       ansible.builtin.shell:
-        cmd: docker network create --attachable --driver overlay --subnet 172.28.0.0/16 stage
+        cmd: docker network create --attachable -d overlay --subnet 172.28.0.0/16 stage || true
 
-    - name: Setup Production Network
+    - name: Setup production network
       ansible.builtin.shell:
-        cmd: docker network create --driver overlay --subnet 172.29.0.0/16 prod
+        cmd: docker network create --attachable -d overlay --subnet 172.29.0.0/16 prod || true
   when: origin
 
 - block:
     - name: Leave Swarm
       ansible.builtin.shell:
         cmd: docker swarm leave --force
-      when: "'inactive' not in status.stdout"
+      when: state.stdout != 'inactive'
 
     - name: Join Swarm as Manager
       ansible.builtin.shell:

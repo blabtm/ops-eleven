@@ -1,4 +1,4 @@
-- name: Uninstall Conflicting Packages
+- name: Uninstall conflicting packages
   ansible.builtin.apt:
     pkg:
       - runc
@@ -9,7 +9,7 @@
       - docker.io
     state: absent
 
-- name: Install Requirements
+- name: Install requirements
   ansible.builtin.apt:
     pkg:
       - ca-certificates
@@ -17,12 +17,12 @@
       - gnupg-agent
     state: latest
 
-- name: Install Docker's Official GPG Key
+- name: Install Docker's official GPG key
   ansible.builtin.apt_key:
     url: https://download.docker.com/linux/debian/gpg
     state: present
 
-- name: Add Docker's APT Repository
+- name: Add Docker's APT repository
   ansible.builtin.apt_repository:
     repo: deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
     state: present
@@ -37,13 +37,13 @@
       - docker-compose-plugin
     state: latest
 
-- name: Grant Persmissions
+- name: Grant persmissions
   ansible.builtin.user:
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
 
-- name: Configure Daemon
+- name: Configure daemon
   ansible.builtin.template:
     src: daemon.json.j2
     dest: /etc/docker/daemon.json
@@ -54,7 +54,13 @@
     state: restarted
     enabled: true
 
-- name: Collect Status
+- name: Recognize the Swarm state
   ansible.builtin.shell: 
-    cmd: docker info --format '{{ "{{.Swarm.LocalNodeState}}" }}'
-  register: status
+    cmd: "docker info --format {% raw %}'{{ .Swarm.LocalNodeState }}'{% endraw %}"
+  register: state
+
+- name: Recognize the Swarm role
+  ansible.builtin.shell:
+    cmd: "docker info --format {% raw %}'{{ .Swarm.ControlAvailable }}'{% endraw %}"
+  register: manager
+  when: state.stdout != 'inactive'
